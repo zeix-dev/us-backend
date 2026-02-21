@@ -1,4 +1,4 @@
-const express = require("express");
+ const express = require("express");
 const Razorpay = require("razorpay");
 const cors = require("cors");
 const crypto = require("crypto");
@@ -6,7 +6,7 @@ const admin = require("firebase-admin");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_KEY);
+console.log("ENV CHECK:", process.env.SERVICE_ACCOUNT_KEY);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
