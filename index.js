@@ -6,8 +6,16 @@ const admin = require("firebase-admin");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 
-console.log("ENV CHECK:", process.env.SERVICE_ACCOUNT_KEY);
+// ✅ CHECK ENV
+if (!process.env.SERVICE_ACCOUNT_KEY) {
+  console.error("SERVICE_ACCOUNT_KEY missing!");
+  process.exit(1);
+}
 
+// ✅ PARSE FIREBASE KEY
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY);
+
+// ✅ INITIALIZE FIREBASE
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
@@ -18,13 +26,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ RAZORPAY SETUP
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET
 });
 
 
+// ===============================
 // ✅ CREATE ORDER WITH COUPON
+// ===============================
 app.post("/create-order", async (req, res) => {
   try {
     const { productId, quantity, couponCode } = req.body;
@@ -42,6 +53,7 @@ app.post("/create-order", async (req, res) => {
       const couponDoc = await db.collection("coupons").doc(couponCode).get();
       if (couponDoc.exists) {
         const coupon = couponDoc.data();
+
         if (coupon.type === "percentage") {
           total -= (total * coupon.value) / 100;
         } else if (coupon.type === "flat") {
@@ -66,7 +78,9 @@ app.post("/create-order", async (req, res) => {
 });
 
 
-// ✅ VERIFY + SAVE ORDER + GENERATE INVOICE
+// ========================================
+// ✅ VERIFY PAYMENT + SAVE + INVOICE
+// ========================================
 app.post("/verify-payment", async (req, res) => {
   try {
     const {
@@ -102,7 +116,7 @@ app.post("/verify-payment", async (req, res) => {
       createdAt: new Date()
     });
 
-    // ✅ Generate Invoice PDF
+    // ✅ Generate Invoice
     const doc = new PDFDocument();
     const filePath = `invoice-${orderRef.id}.pdf`;
 
@@ -123,7 +137,7 @@ app.post("/verify-payment", async (req, res) => {
 
     res.json({
       success: true,
-      invoiceUrl: `https://us-backend-ltwc.onrender.com/${filePath}`
+      invoiceUrl: `${req.protocol}://${req.get("host")}/${filePath}`
     });
 
   } catch (err) {
@@ -133,6 +147,7 @@ app.post("/verify-payment", async (req, res) => {
 });
 
 
+// ✅ STATIC FILE SERVE
 app.use(express.static("./"));
 
 const PORT = process.env.PORT || 10000;
