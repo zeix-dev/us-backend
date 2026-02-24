@@ -1,4 +1,3 @@
-console.log("REQ BODY:", req.body);
 const express = require("express");
 const Razorpay = require("razorpay");
 const cors = require("cors");
@@ -6,6 +5,7 @@ const crypto = require("crypto");
 const admin = require("firebase-admin");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
+const path = require("path");
 
 // ================= ENV CHECK =================
 if (!process.env.SERVICE_ACCOUNT_KEY) {
@@ -37,7 +37,7 @@ app.get("/", (req, res) => {
 });
 
 // =================================================
-// ✅ CREATE ORDER (FIXED + SAFE CALCULATION)
+// ✅ CREATE ORDER
 // =================================================
 app.post("/create-order", async (req, res) => {
   try {
@@ -67,11 +67,9 @@ app.post("/create-order", async (req, res) => {
     }
 
     total = Math.round(total);
-
     if (total < 1) total = 1;
 
     console.log("FINAL TOTAL:", total);
-    console.log("RAZORPAY AMOUNT:", total * 100);
 
     const order = await razorpay.orders.create({
       amount: total * 100,
@@ -114,8 +112,8 @@ app.post("/verify-payment", async (req, res) => {
 
     // ===== SAVE ORDER =====
     const orderRef = await db.collection("orders").add({
-      productId,
-      quantity,
+      productId: productId || null,
+      quantity: quantity || 1,
       couponCode: couponCode || null,
       amount: Number(finalAmount),
       paymentId: razorpay_payment_id,
@@ -125,9 +123,10 @@ app.post("/verify-payment", async (req, res) => {
     });
 
     // ===== GENERATE INVOICE =====
-    const filePath = `invoice-${orderRef.id}.pdf`;
-    const doc = new PDFDocument();
+    const invoiceName = `invoice-${orderRef.id}.pdf`;
+    const filePath = path.join(__dirname, invoiceName);
 
+    const doc = new PDFDocument();
     doc.pipe(fs.createWriteStream(filePath));
 
     doc.fontSize(20).text("MuscleOxy Nutrition Invoice", { align: "center" });
@@ -136,8 +135,8 @@ app.post("/verify-payment", async (req, res) => {
     doc.text(`Payment ID: ${razorpay_payment_id}`);
     doc.text(`Customer: ${customerName}`);
     doc.text(`Email: ${customerEmail}`);
-    doc.text(`Product ID: ${productId}`);
-    doc.text(`Quantity: ${quantity}`);
+    doc.text(`Product ID: ${productId || "-"}`);
+    doc.text(`Quantity: ${quantity || 1}`);
     doc.text(`Total Paid: ₹${finalAmount}`);
     doc.text(`Date: ${new Date().toLocaleString()}`);
 
@@ -145,7 +144,7 @@ app.post("/verify-payment", async (req, res) => {
 
     res.json({
       success: true,
-      invoiceUrl: `${req.protocol}://${req.get("host")}/${filePath}`
+      invoiceUrl: `${req.protocol}://${req.get("host")}/${invoiceName}`
     });
 
   } catch (err) {
@@ -155,7 +154,7 @@ app.post("/verify-payment", async (req, res) => {
 });
 
 // ================= STATIC =================
-app.use(express.static("./"));
+app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log("Server running on port", PORT));
