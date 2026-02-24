@@ -1,3 +1,4 @@
+console.log("REQ BODY:", req.body);
 const express = require("express");
 const Razorpay = require("razorpay");
 const cors = require("cors");
@@ -40,15 +41,13 @@ app.get("/", (req, res) => {
 // =================================================
 app.post("/create-order", async (req, res) => {
   try {
-    const { productId, quantity = 1, couponCode } = req.body;
+    const { price, quantity = 1, couponCode } = req.body;
 
-    const productDoc = await db.collection("products").doc(productId).get();
-    if (!productDoc.exists) {
-      return res.status(404).json({ error: "Product not found" });
+    if (!price || price <= 0) {
+      return res.status(400).json({ error: "Invalid price" });
     }
 
-    const product = productDoc.data();
-    let total = Number(product.price) * Number(quantity);
+    let total = Number(price) * Number(quantity);
 
     // ===== APPLY COUPON =====
     if (couponCode) {
